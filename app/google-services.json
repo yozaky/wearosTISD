@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "549997969213",
+    "project_id": "tareaintegradora-1850c",
+    "storage_bucket": "tareaintegradora-1850c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:549997969213:android:c2f9893aeaf479ddc50f54",
+        "android_client_info": {
+          "package_name": "com.yozaky.tareaintegradora"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjk3QvfygsWqy0YUKDVnaEX4ho5jwxiTc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
