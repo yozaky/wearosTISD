@@ -11,6 +11,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
@@ -19,8 +21,17 @@ class AuthViewModel(private val dataStoreManager: DataStoreManager) : ViewModel(
     private val _authState = MutableStateFlow<AuthState>(AuthState.Loading)
     val authState: StateFlow<AuthState> = _authState
 
+    private val logging = HttpLoggingInterceptor().apply {
+        level = HttpLoggingInterceptor.Level.BODY
+    }
+
+    private val client = OkHttpClient.Builder()
+        .addInterceptor(logging)
+        .build()
+
     private val apiService: ApiService = Retrofit.Builder()
-        .baseUrl("http://localhost:3000") // REEMPLAZAR CON TU URL
+        .baseUrl("http://10.0.2.2:3000") // 10.0.2.2 es el localhost de tu PC para el emulador
+        .client(client)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
         .create(ApiService::class.java)
@@ -53,7 +64,8 @@ class AuthViewModel(private val dataStoreManager: DataStoreManager) : ViewModel(
                     _authState.value = AuthState.Error("PIN Incorrecto")
                 }
             } catch (e: Exception) {
-                _authState.value = AuthState.Error("Error de conexión")
+                e.printStackTrace()
+                _authState.value = AuthState.Error("Error de conexión: ${e.message}")
             }
         }
     }
