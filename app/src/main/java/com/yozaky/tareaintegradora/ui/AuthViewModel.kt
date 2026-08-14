@@ -1,43 +1,48 @@
 package com.yozaky.tareaintegradora.ui
 
+import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.messaging.FirebaseMessaging
 import com.yozaky.tareaintegradora.api.ApiService
 import com.yozaky.tareaintegradora.api.LoginRequest
+import com.yozaky.tareaintegradora.api.RetrofitClient
 import com.yozaky.tareaintegradora.data.DataStoreManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 
 class AuthViewModel(private val dataStoreManager: DataStoreManager) : ViewModel() {
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Loading)
     val authState: StateFlow<AuthState> = _authState
 
-    private val logging = HttpLoggingInterceptor().apply {
-        level = HttpLoggingInterceptor.Level.BODY
-    }
+    private val _serviceStatus = MutableStateFlow<ServiceStatus>(ServiceStatus.Checking)
+    val serviceStatus: StateFlow<ServiceStatus> = _serviceStatus
 
-    private val client = OkHttpClient.Builder()
-        .addInterceptor(logging)
-        .build()
-
-    private val apiService: ApiService = Retrofit.Builder()
-        .baseUrl("http://10.0.2.2:3000") // 10.0.2.2 es el localhost de tu PC para el emulador
-        .client(client)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
-        .create(ApiService::class.java)
+    private val apiService: ApiService = RetrofitClient.instance
 
     init {
+        checkStatus()
         checkToken()
+    }
+
+    fun checkStatus() {
+        viewModelScope.launch {
+            _serviceStatus.value = ServiceStatus.Checking
+            try {
+                val response = apiService.checkStatus()
+                if (response.isSuccessful && response.body()?.disponible == true) {
+                    _serviceStatus.value = ServiceStatus.Available
+                } else {
+                    _serviceStatus.value = ServiceStatus.Unavailable
+                }
+            } catch (e: Exception) {
+                _serviceStatus.value = ServiceStatus.Unavailable
+            }
+        }
     }
 
     private fun checkToken() {
@@ -49,19 +54,23 @@ class AuthViewModel(private val dataStoreManager: DataStoreManager) : ViewModel(
 
     fun login(pin: String) {
         viewModelScope.launch {
+            _authState.value = AuthState.Loading
             try {
                 val fcmToken = try {
                     FirebaseMessaging.getInstance().token.await()
                 } catch (e: Exception) {
                     "token_error"
                 }
-                val response = apiService.login(LoginRequest(pin, fcmToken))
+                
+                val dispositivo = "${Build.MANUFACTURER} ${Build.MODEL}"
+                val response = apiService.login(LoginRequest(pin, fcmToken, dispositivo))
                 
                 if (response.isSuccessful && response.body()?.token != null) {
                     dataStoreManager.saveToken(response.body()!!.token!!)
                     _authState.value = AuthState.Authenticated
                 } else {
-                    _authState.value = AuthState.Error("PIN Incorrecto")
+                    val errorMsg = response.body()?.error ?: "PIN Incorrecto"
+                    _authState.value = AuthState.Error(errorMsg)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -83,4 +92,10 @@ sealed class AuthState {
     object Authenticated : AuthState()
     object Unauthenticated : AuthState()
     data class Error(val message: String) : AuthState()
+}
+
+sealed class ServiceStatus {
+    object Checking : ServiceStatus()
+    object Available : ServiceStatus()
+    object Unavailable : ServiceStatus()
 }
